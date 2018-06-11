@@ -16,16 +16,16 @@ fi
 
 make_backup () {
 
-    export FILENAME={{FILENAME}}
-    export CONTAINER={{CONTAINER}}
-    export MYSQL_HOST={{MYSQL_HOST}}
-    export MYSQL_PORT={{MYSQL_PORT}}
-    export DB_USER={{DB_USER}}
-    export DB_PASSWORD={{DB_PASSWORD}}
-    export DB_NAME={{DB_NAME}}
-    export DEBUG={{DEBUG}}
-    export AZURE_STORAGE_ACCOUNT={{AZURE_STORAGE_ACCOUNT}}
-    export AZURE_STORAGE_ACCESS_KEY={{AZURE_STORAGE_ACCESS_KEY}}
+    export FILENAME=${FILENAME}
+    export CONTAINER=${CONTAINER}
+    export MYSQL_HOST=${MYSQL_HOST}
+    export MYSQL_PORT=${MYSQL_PORT}
+    export DB_USER=${DB_USER}
+    export DB_PASSWORD=${DB_PASSWORD}
+    export DB_NAME=${DB_NAME}
+    export DEBUG=${DEBUG}
+    export AZURE_STORAGE_ACCOUNT=${AZURE_STORAGE_ACCOUNT}
+    export AZURE_STORAGE_ACCESS_KEY=${AZURE_STORAGE_ACCESS_KEY}
 
     if [ "$DEBUG" == "true" ]; then
         echo "######################################"
@@ -40,14 +40,28 @@ make_backup () {
         echo "DB_NAME = $DB_NAME"
         echo "######################################"
     fi
-
+ 
+    # If no password is supplied 
     if [ "$NO_PASSWORD" == "true" ]; then
 
-        mysqldump -h $MYSQL_HOST -P $MYSQL_PORT -u $DB_USER $DB_NAME > $FILENAME-$DATETIME.sql;
+        # If DB is specified
+        if [  -n "$DB_NAME" ]; then 
+            mysqldump -h $MYSQL_HOST -P $MYSQL_PORT -u $DB_USER $DB_NAME > $FILENAME-$DATETIME.sql;
+        else
+        # If DB is not specified, do all DB
+            mysqldump -h $MYSQL_HOST -P $MYSQL_PORT -u $DB_USER --all-databases > $FILENAME-$DATETIME.sql;
+        fi
 
+    # Password is provided
     else
 
-        mysqldump -h $MYSQL_HOST -P $MYSQL_PORT -u $DB_USER --password=$DB_PASSWORD $DB_NAME > $FILENAME-$DATETIME.sql;
+        # If DB is specified
+        if [  -n "$DB_NAME" ]; then 
+            mysqldump -h $MYSQL_HOST -P $MYSQL_PORT -u $DB_USER --password=$DB_PASSWORD $DB_NAME > $FILENAME-$DATETIME.sql;
+        else
+        # If DB is not specified, do all DB
+            mysqldump -h $MYSQL_HOST -P $MYSQL_PORT -u $DB_USER --password=$DB_PASSWORD --all-databases > $FILENAME-$DATETIME.sql;
+        fi
 
     fi
 
@@ -59,6 +73,7 @@ make_backup () {
     # compress the file
     gzip -9 $FILENAME-$DATETIME.sql
     # Send to cloud storage
+    azure telemetry --disable
     /usr/local/bin/azure storage blob upload $FILENAME-$DATETIME.sql.gz $CONTAINER -c "DefaultEndpointsProtocol=https;BlobEndpoint=https://$AZURE_STORAGE_ACCOUNT.blob.core.windows.net/;AccountName=$AZURE_STORAGE_ACCOUNT;AccountKey=$AZURE_STORAGE_ACCESS_KEY"
 
     if  [ "$?" != "0" ]; then
